@@ -132,6 +132,14 @@ class ConnectionHandler(metaclass=abc.ABCMeta):
             self.log("transports closed!", "debug")
 
     async def open_connection(self, command: commands.OpenConnection) -> None:
+        proxy_host = ctx.options.listen_host or "localhost"
+        proxy_port = ctx.options.listen_port or 8080
+
+        if command.connection.address[0] == proxy_host and command.connection.address[1] == proxy_port:
+            self.log(f"avoided recursive connection to proxy", level="debug")
+            self.server_event(events.OpenConnectionCompleted(command, None))
+            return
+
         if not command.connection.address:
             self.log(f"Cannot open connection, no hostname given.")
             self.server_event(events.OpenConnectionCompleted(command, f"Cannot open connection, no hostname given."))
