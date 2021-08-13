@@ -16,7 +16,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 
 from OpenSSL import SSL
-from mitmproxy import http, options as moptions
+from mitmproxy import http, options as moptions, ctx
 from mitmproxy.proxy.context import Context
 from mitmproxy.proxy.layers.http import HTTPMode
 from mitmproxy.proxy import commands, events, layer, layers, server_hooks
@@ -98,7 +98,7 @@ class ConnectionHandler(metaclass=abc.ABCMeta):
         if not watch:
             return  # this should not be needed, see asyncio_utils.create_task
 
-        self.log("client connect")
+        self.log("client connect", level="debug")
         await self.handle_hook(server_hooks.ClientConnectedHook(self.client))
         if self.client.error:
             self.log("client kill connection")
@@ -119,7 +119,7 @@ class ConnectionHandler(metaclass=abc.ABCMeta):
 
         watch.cancel()
 
-        self.log("client disconnect")
+        self.log("client disconnect", level="debug")
         self.client.timestamp_end = time.time()
         await self.handle_hook(server_hooks.ClientDisconnectedHook(self.client))
 
@@ -176,7 +176,7 @@ class ConnectionHandler(metaclass=abc.ABCMeta):
                     addr = f"{human.format_address(command.connection.address)} ({human.format_address(command.connection.peername)})"
                 else:
                     addr = human.format_address(command.connection.address)
-                self.log(f"server connect {addr}")
+                self.log(f"server connect {addr}", level="debug")
                 connected_hook = asyncio_utils.create_task(
                     self.handle_hook(server_hooks.ServerConnectedHook(hook_data)),
                     name=f"handle_hook(server_connected) {addr}",
@@ -200,7 +200,7 @@ class ConnectionHandler(metaclass=abc.ABCMeta):
                 self.transports[command.connection].handler = new_handler
                 await asyncio.wait([new_handler])
 
-                self.log(f"server disconnect {addr}")
+                self.log(f"server disconnect {addr}", level="debug")
                 command.connection.timestamp_end = time.time()
                 await connected_hook  # wait here for this so that closed always comes after connected.
                 await self.handle_hook(server_hooks.ServerDisconnectedHook(hook_data))
