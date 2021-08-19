@@ -179,8 +179,29 @@ def read_request_head(lines: List[bytes]) -> Request:
     Raises:
         ValueError: The input is malformed.
     """
-    host, port, method, scheme, authority, path, http_version = _read_request_line(lines[0])
-    headers = _read_headers(lines[1:])
+
+    if "PROXY" in lines[0].decode():
+        # Move PROXY protocol header to custom headers
+        lines.append( b"X-PS-Proxy: " + lines[0] )
+        
+        if "UNKNOWN" in lines[0].decode():
+            # If IP or protocol is not known (more info at http://www.haproxy.org/download/1.8/doc/proxy-protocol.txt)
+            # then set custom headers for client data as UNKNOWN as well
+            lines.append( b"X-PS-Proxy-Client-IP: " + b"UNKNOWN" )
+            lines.append( b"X-PS-Proxy-Client-Port: " + b"UNKNOWN" )
+        else:
+            # If proxy protocol header is OK, then extract client data
+            lines.append( b"X-PS-Proxy-Client-IP: " + lines[0].split()[2] )
+            lines.append( b"X-PS-Proxy-Client-Port: " + lines[0].split()[4] )
+
+        # Extract properties from actual Method line, that was moved to the second position after Google
+        # added the PROXY protocol header first
+        host, port, method, scheme, authority, path, http_version = _read_request_line(lines[1])
+        # Pass the headers already present on the request plus the new custom ones we just made
+        headers = _read_headers(lines[2:])
+    else:
+        host, port, method, scheme, authority, path, http_version = _read_request_line(lines[0])
+        headers = _read_headers(lines[1:])
 
     return Request(
         host=host,
